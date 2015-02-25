@@ -1,6 +1,5 @@
 package net.org.selector.storer.config;
 
-import net.org.selector.storer.web.filter.CachingHttpHeadersFilter;
 import net.org.selector.storer.web.filter.gzip.GZipServletFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +38,6 @@ public class WebConfigurer implements ServletContextInitializer, EmbeddedServlet
         log.info("Web application configuration, using profiles: {}", Arrays.toString(env.getActiveProfiles()));
         EnumSet<DispatcherType> disps = EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.ASYNC);
         if (env.acceptsProfiles(Constants.SPRING_PROFILE_PRODUCTION)) {
-            initCachingHttpHeadersFilter(servletContext, disps);
             initGzipFilter(servletContext, disps);
         }
         log.info("Web application fully configured");
@@ -68,20 +66,5 @@ public class WebConfigurer implements ServletContextInitializer, EmbeddedServlet
         compressingFilter.setInitParameters(parameters);
         compressingFilter.addMappingForUrlPatterns(disps, true, "/api/*");
         compressingFilter.setAsyncSupported(true);
-    }
-
-    /**
-     * Initializes the cachig HTTP Headers Filter.
-     */
-    private void initCachingHttpHeadersFilter(ServletContext servletContext,
-                                              EnumSet<DispatcherType> disps) {
-        log.debug("Registering Caching HTTP Headers Filter");
-        FilterRegistration.Dynamic cachingHttpHeadersFilter =
-                servletContext.addFilter("cachingHttpHeadersFilter",
-                        new CachingHttpHeadersFilter());
-
-        cachingHttpHeadersFilter.addMappingForUrlPatterns(disps, true, "/assets/*");
-        cachingHttpHeadersFilter.addMappingForUrlPatterns(disps, true, "/scripts/*");
-        cachingHttpHeadersFilter.setAsyncSupported(true);
     }
 }
