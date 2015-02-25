@@ -4,6 +4,7 @@ endpoints.jolokia.enabled: false
 multipart.maxFileSize: 1024MB
 multipart.maxRequestSize: 1024MB
 multipart/form-data: 1024MB
+multipart.fileSizeThreshold: 10MB
 
 async:
     corePoolSize: 2
