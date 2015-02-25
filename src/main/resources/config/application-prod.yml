@@ -9,5 +9,6 @@ spring:
             host: localhost
             port: 27017
             database: storer
-
+files:
+    unusedLiveInHours: 3600000
 
