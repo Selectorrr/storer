@@ -5,6 +5,8 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
 import com.sun.istack.internal.Nullable;
 import org.joda.time.DateTime;
@@ -33,7 +35,7 @@ public class FileService implements EnvironmentAware {
 
     @Scheduled(cron = "0 1 * * * ?")
     public void clearUnusedFiles() {
-        List<GridFSDBFile> tmpFiles = gridFsTemplate.find(new Query().addCriteria(Criteria.where("used").exists(false)));
+        List<GridFSDBFile> tmpFiles = gridFsTemplate.find(new Query().addCriteria(Criteria.where("metadata.used").exists(false)));
         Set<GridFSDBFile> oldFiles = FluentIterable
             .from(tmpFiles)
             .filter(new Predicate<GridFSDBFile>() {
@@ -50,6 +52,16 @@ public class FileService implements EnvironmentAware {
             }
         }));
         gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").in(filesForRemove)));
+    }
+
+    public void markAsUsed(List<String> names) {
+        List<GridFSDBFile> unusedFiles = gridFsTemplate.find(new Query().addCriteria(Criteria.where("filename").in(names)));
+        DBObject metaData = new BasicDBObject();
+        metaData.put("used", true);
+        for (GridFSDBFile unusedFile : unusedFiles) {
+            unusedFile.setMetaData(metaData);
+            unusedFile.save();
+        }
     }
 
     @Override
