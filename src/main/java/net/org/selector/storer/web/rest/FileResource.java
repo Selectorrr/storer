@@ -24,6 +24,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +36,7 @@ import java.util.zip.GZIPOutputStream;
  * SLitvinov on 25.02.2015.
  */
 @Controller
-@RequestMapping("/storer/files/**")
+@RequestMapping("/files/**")
 public class FileResource {
     private final Logger log = LoggerFactory.getLogger(FileResource.class);
     private static final int DEFAULT_BUFFER_SIZE = 10240; // ..bytes = 10KB.
@@ -44,27 +45,6 @@ public class FileResource {
 
     @Inject
     private GridFsTemplate gridFsTemplate;
-
-    /**
-     * POST  /rest/files -> Create a new file.
-     */
-    @RequestMapping(method = RequestMethod.POST)
-    @ResponseBody
-    public ResponseEntity<String> create(HttpServletRequest request, @RequestParam("file") MultipartFile file) {
-        String filename = request.getServletPath() + "/" + UUID.randomUUID().toString() + "/" + file.getOriginalFilename();
-        log.debug("REST request to save File : {}", filename);
-        if (!file.isEmpty()) {
-            try {
-                gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(filename)));
-                gridFsTemplate.store(file.getInputStream(), filename, file.getContentType());
-                return new ResponseEntity<>(filename, HttpStatus.OK);
-            } catch (Exception e) {
-                return new ResponseEntity<>("You failed to upload " + filename + " => " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        } else {
-            return new ResponseEntity<>("You failed to upload " + filename + " because the file was empty.", HttpStatus.NO_CONTENT);
-        }
-    }
 
     /**
      * GET  /rest/files/:filename -> get the "filename" file.
@@ -314,12 +294,53 @@ public class FileResource {
         }
     }
 
+    /**
+     * POST  /rest/files -> Create a new file.
+     */
+    @RequestMapping(method = RequestMethod.POST)
+    @ResponseBody
+    public ResponseEntity<String> createOrUpdate(HttpServletRequest request,
+                                                 @RequestParam(value = "path", required = false) String path,
+                                                 @RequestParam("file") MultipartFile file) throws UnsupportedEncodingException {
+        String filename;
+        if (!Strings.isNullOrEmpty(path)) {
+            filename = URLDecoder.decode(path, "UTF-8");
+        } else {
+            filename = request.getServletPath() + "/" + UUID.randomUUID().toString() + "/" + file.getOriginalFilename();
+        }
+        filename = filename.replace("//", "/");
+        log.debug("REST request to save or replace File : {}", filename);
+        if (!file.isEmpty()) {
+            try {
+                if (!Strings.isNullOrEmpty(path)) {
+                    gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(filename)));
+                }
+                gridFsTemplate.store(file.getInputStream(), filename, file.getContentType());
+                return new ResponseEntity<>(filename, HttpStatus.OK);
+            } catch (Exception e) {
+                return new ResponseEntity<>("You failed to upload " + filename + " => " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } else {
+            return new ResponseEntity<>("You failed to upload " + filename + " because the file was empty.", HttpStatus.NO_CONTENT);
+        }
+    }
+
+    /**
+     * DELETE  /rest/files/:filename -> delete the "filename" file.
+     */
+    @RequestMapping(method = RequestMethod.DELETE)
+    public void delete(HttpServletRequest request) {
+        log.debug("REST request to delete file : {}", request.getRequestURL().toString());
+        gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(request.getRequestURL().toString())));
+    }
+
     private static boolean matches(String matchHeader, String toMatch) {
         String[] matchValues = matchHeader.split("\\s*,\\s*");
         Arrays.sort(matchValues);
         return Arrays.binarySearch(matchValues, toMatch) > -1
             || Arrays.binarySearch(matchValues, "*") > -1;
     }
+
 
     /**
      * Returns a substring of the given string value from the given begin index to the given end
@@ -371,13 +392,4 @@ public class FileResource {
             || Arrays.binarySearch(acceptValues, "*/*") > -1;
     }
 
-
-    /**
-     * DELETE  /rest/files/:filename -> delete the "filename" file.
-     */
-    @RequestMapping(method = RequestMethod.DELETE)
-    public void delete(HttpServletRequest request) {
-        log.debug("REST request to delete file : {}", request.getRequestURL().toString());
-        gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(request.getRequestURL().toString())));
-    }
 }
