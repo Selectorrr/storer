@@ -8,7 +8,6 @@ import com.google.common.collect.Sets;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
-import com.sun.istack.internal.Nullable;
 import org.joda.time.DateTime;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
@@ -45,7 +44,6 @@ public class FileService implements EnvironmentAware {
                 }
             }).toSet();
         Set<String> filesForRemove = Sets.newHashSet(Iterables.transform(oldFiles, new Function<GridFSDBFile, String>() {
-            @Nullable
             @Override
             public String apply(GridFSDBFile input) {
                 return input.getFilename();
