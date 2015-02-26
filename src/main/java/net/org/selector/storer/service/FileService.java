@@ -19,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.inject.Inject;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Set;
 
@@ -31,6 +32,24 @@ public class FileService implements EnvironmentAware {
     private GridFsTemplate gridFsTemplate;
     private static final String ENV_FILES = "files.";
     private RelaxedPropertyResolver propertyResolver;
+
+
+    public void save(String filename, InputStream inputStream, String contentType) {
+        Query byName = new Query().addCriteria(Criteria.where("filename").is(filename));
+        gridFsTemplate.delete(byName);
+        gridFsTemplate.store(inputStream, filename, contentType);
+    }
+
+    public void delete(String s) {
+        Query filename = new Query().addCriteria(Criteria.where("filename").is(s));
+        gridFsTemplate.delete(filename);
+    }
+
+
+    public GridFSDBFile findOneByName(String filename) {
+        Query criteria = new Query().addCriteria(Criteria.where("filename").is(filename));
+        return gridFsTemplate.findOne(criteria);
+    }
 
     @Scheduled(cron = "0 1 * * * ?")
     public void clearUnusedFiles() {

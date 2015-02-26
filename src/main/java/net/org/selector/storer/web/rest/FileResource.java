@@ -2,12 +2,10 @@ package net.org.selector.storer.web.rest;
 
 import com.google.common.base.Strings;
 import com.mongodb.gridfs.GridFSDBFile;
+import net.org.selector.storer.service.FileService;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.gridfs.GridFsTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -44,7 +42,7 @@ public class FileResource {
     private static final String MULTIPART_BOUNDARY = "MULTIPART_BYTERANGES";
 
     @Inject
-    private GridFsTemplate gridFsTemplate;
+    private FileService fileService;
 
     /**
      * GET  /rest/files/:filename -> get the "filename" file.
@@ -64,8 +62,7 @@ public class FileResource {
             return;
         }
 
-        GridFSDBFile file = gridFsTemplate.findOne(
-            new Query().addCriteria(Criteria.where("filename").is(filename)));
+        GridFSDBFile file = fileService.findOneByName(filename);
 
 
         // Check if file actually exists in filesystem.
@@ -312,10 +309,7 @@ public class FileResource {
         log.debug("REST request to save or replace File : {}", filename);
         if (!file.isEmpty()) {
             try {
-                if (!Strings.isNullOrEmpty(path)) {
-                    gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(filename)));
-                }
-                gridFsTemplate.store(file.getInputStream(), filename, file.getContentType());
+                fileService.save(filename, file.getInputStream(), file.getContentType());
                 return new ResponseEntity<>(filename, HttpStatus.OK);
             } catch (Exception e) {
                 return new ResponseEntity<>("You failed to upload " + filename + " => " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -325,13 +319,14 @@ public class FileResource {
         }
     }
 
+
     /**
      * DELETE  /rest/files/:filename -> delete the "filename" file.
      */
     @RequestMapping(method = RequestMethod.DELETE)
     public void delete(HttpServletRequest request) {
         log.debug("REST request to delete file : {}", request.getRequestURL().toString());
-        gridFsTemplate.delete(new Query().addCriteria(Criteria.where("filename").is(request.getRequestURL().toString())));
+        fileService.delete(request.getRequestURL().toString());
     }
 
     private static boolean matches(String matchHeader, String toMatch) {
