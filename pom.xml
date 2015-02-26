@@ -135,7 +135,11 @@
             <artifactId>guava</artifactId>
             <version>16.0.1</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.imgscalr</groupId>
+            <artifactId>imgscalr-lib</artifactId>
+            <version>4.2</version>
+        </dependency>
 
     </dependencies>
     <build>

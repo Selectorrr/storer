@@ -1,8 +1,11 @@
 package net.org.selector.storer.web.rest;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Table;
 import com.mongodb.gridfs.GridFSDBFile;
 import net.org.selector.storer.service.FileService;
+import net.org.selector.storer.service.ImageService;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,10 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -43,6 +43,8 @@ public class FileResource {
 
     @Inject
     private FileService fileService;
+    @Inject
+    private ImageService imageService;
 
     /**
      * GET  /rest/files/:filename -> get the "filename" file.
@@ -296,9 +298,27 @@ public class FileResource {
      */
     @RequestMapping(method = RequestMethod.POST)
     @ResponseBody
-    public ResponseEntity<String> createOrUpdate(HttpServletRequest request,
-                                                 @RequestParam(value = "path", required = false) String path,
-                                                 @RequestParam("file") MultipartFile file) throws UnsupportedEncodingException {
+    public ResponseEntity<List<String>> createOrUpdate(HttpServletRequest request,
+                                                       @RequestParam(value = "path", required = false) String path,
+                                                       @RequestParam("file") MultipartFile file,
+                                                       @RequestParam(value = "imageSizes", required = false) String[] imageSizes) throws IOException {
+        String filename = getComputeFileName(request, path, file);
+        List<String> result = Lists.newArrayList();
+        if (imageSizes != null && imageSizes.length > 0) {
+            for (String imageSize : new HashSet<>(Arrays.asList(imageSizes))) {
+                Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(filename,
+                    file.getInputStream(), file.getContentType(), imageSize);
+                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey());
+                result.add(imageResult.getRowKey());
+            }
+        } else {
+            fileService.save(filename, file.getInputStream(), file.getContentType());
+            result.add(filename);
+        }
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    private String getComputeFileName(HttpServletRequest request, String path, MultipartFile file) throws UnsupportedEncodingException {
         String filename;
         if (!Strings.isNullOrEmpty(path)) {
             filename = URLDecoder.decode(path, "UTF-8");
@@ -306,17 +326,7 @@ public class FileResource {
             filename = request.getServletPath() + "/" + UUID.randomUUID().toString() + "/" + file.getOriginalFilename();
         }
         filename = filename.replace("//", "/");
-        log.debug("REST request to save or replace File : {}", filename);
-        if (!file.isEmpty()) {
-            try {
-                fileService.save(filename, file.getInputStream(), file.getContentType());
-                return new ResponseEntity<>(filename, HttpStatus.OK);
-            } catch (Exception e) {
-                return new ResponseEntity<>("You failed to upload " + filename + " => " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        } else {
-            return new ResponseEntity<>("You failed to upload " + filename + " because the file was empty.", HttpStatus.NO_CONTENT);
-        }
+        return filename;
     }
 
 
