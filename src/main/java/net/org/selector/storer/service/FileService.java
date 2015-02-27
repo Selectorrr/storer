@@ -34,10 +34,11 @@ public class FileService implements EnvironmentAware {
     private RelaxedPropertyResolver propertyResolver;
 
 
-    public void save(String filename, InputStream inputStream, String contentType) {
+    public void save(String filename, InputStream inputStream, String contentType, List<String> result) {
         Query byName = new Query().addCriteria(Criteria.where("filename").is(filename));
         gridFsTemplate.delete(byName);
         gridFsTemplate.store(inputStream, filename, contentType);
+        result.add(filename);
     }
 
     public void delete(String s) {
