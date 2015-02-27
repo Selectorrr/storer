@@ -308,12 +308,10 @@ public class FileResource {
             for (String imageSize : new HashSet<>(Arrays.asList(imageSizes))) {
                 Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(filename,
                     file.getInputStream(), file.getContentType(), imageSize);
-                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey());
-                result.add(imageResult.getRowKey());
+                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
             }
         } else {
-            fileService.save(filename, file.getInputStream(), file.getContentType());
-            result.add(filename);
+            fileService.save(filename, file.getInputStream(), file.getContentType(), result);
         }
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
