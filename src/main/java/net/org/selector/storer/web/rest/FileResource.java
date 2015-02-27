@@ -1,12 +1,17 @@
 package net.org.selector.storer.web.rest;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Table;
+import com.google.common.collect.ImmutableList;
 import com.mongodb.gridfs.GridFSDBFile;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
 import org.apache.commons.io.IOUtils;
+import org.apache.tomcat.util.http.fileupload.FileItemHeaders;
+import org.apache.tomcat.util.http.fileupload.FileUploadException;
+import org.apache.tomcat.util.http.fileupload.MultipartStream;
+import org.apache.tomcat.util.http.fileupload.servlet.ServletFileUpload;
+import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
+import org.apache.tomcat.util.http.fileupload.util.LimitedInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -22,20 +27,19 @@ import javax.inject.Inject;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
+
+import static org.apache.tomcat.util.http.fileupload.IOUtils.closeQuietly;
 
 /**
  * SLitvinov on 25.02.2015.
  */
 @Controller
 @RequestMapping("/files/**")
-public class FileResource {
+public class FileResource extends ServletFileUpload {
     private final Logger log = LoggerFactory.getLogger(FileResource.class);
     private static final int DEFAULT_BUFFER_SIZE = 10240; // ..bytes = 10KB.
     private static final long DEFAULT_EXPIRE_TIME = 604800000L; // ..ms = 1 week.
@@ -45,6 +49,7 @@ public class FileResource {
     private FileService fileService;
     @Inject
     private ImageService imageService;
+    private long sizeMax = -1;
 
     /**
      * GET  /rest/files/:filename -> get the "filename" file.
@@ -300,21 +305,77 @@ public class FileResource {
     @ResponseBody
     public ResponseEntity<List<String>> createOrUpdate(HttpServletRequest request,
                                                        @RequestParam(value = "path", required = false) String path,
-                                                       @RequestParam("file") MultipartFile file,
-                                                       @RequestParam(value = "imageSizes", required = false) String[] imageSizes) throws IOException {
-        String filename = getComputeFileName(request, path, file);
-        List<String> result = Lists.newArrayList();
-        if (imageSizes != null && imageSizes.length > 0) {
-            for (String imageSize : new HashSet<>(Arrays.asList(imageSizes))) {
-                Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(filename,
-                    file.getInputStream(), file.getContentType(), imageSize);
-                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
-            }
-        } else {
-            fileService.save(filename, file.getInputStream(), file.getContentType(), result);
+                                                       @RequestParam(value = "imageSizes", required = false) String[] imageSizes) throws IOException, FileUploadException {
+        ServletRequestContext ctx = new ServletRequestContext(request);
+        String contentType = ctx.getContentType();
+        if (!isMultipartContent(ctx)) {
+            throw new InvalidContentTypeException(String.format(
+                "the request doesn't contain a %s or %s stream, content type header is %s",
+                MULTIPART_FORM_DATA, MULTIPART_MIXED, contentType));
         }
-        return new ResponseEntity<>(result, HttpStatus.OK);
+
+        final long requestSize = ctx.contentLength();
+
+        InputStream input; // N.B. this is eventually closed in MultipartStream processing
+//        if (sizeMax >= 0) {
+//            if (requestSize != -1 && requestSize > sizeMax) {
+//                throw new SizeLimitExceededException(String.format(
+//                    "the request was rejected because its size (%s) exceeds the configured maximum (%s)",
+//                    requestSize, sizeMax),
+//                    requestSize, sizeMax);
+//            }
+//            // N.B. this is eventually closed in MultipartStream processing
+//            input = new LimitedInputStream(ctx.getInputStream(), sizeMax) {
+//                @Override
+//                protected void raiseError(long pSizeMax, long pCount)
+//                    throws IOException {
+//                    FileUploadException ex = new SizeLimitExceededException(
+//                        String.format("the request was rejected because its size (%s) exceeds the configured maximum (%s)",
+//                            pCount, pSizeMax),
+//                        pCount, pSizeMax);
+//                    throw new FileUploadIOException(ex);
+//                }
+//            };
+//        } else {
+            input = ctx.getInputStream();
+//        }
+        String charEncoding = ctx.getCharacterEncoding();
+        byte[] boundary = getBoundary(contentType);
+        if (boundary == null) {
+            closeQuietly(input); // avoid possible resource leak
+            throw new FileUploadException("the request was rejected because no multipart boundary was found");
+        }
+
+        MultipartStream multi;
+        try {
+            multi = new MultipartStream(input, boundary, 4096, null);
+        } catch (IllegalArgumentException iae) {
+            org.apache.tomcat.util.http.fileupload.IOUtils.closeQuietly(input); // avoid possible resource leak
+            throw new InvalidContentTypeException(
+                String.format("The boundary specified in the %s header is too long", CONTENT_TYPE), iae);
+        }
+        multi.setHeaderEncoding(charEncoding);
+
+
+        boolean nextPart = multi.skipPreamble();
+        FileItemHeaders headers = getParsedHeaders(multi.readHeaders());
+        String fieldName = getFieldName(headers);
+        String fileName = getFileName(headers);
+
+//        String filename = getComputeFileName(request, path, file);
+//        List<String> result = Lists.newArrayList();
+//        if (imageSizes != null && imageSizes.length > 0) {
+//            for (String imageSize : new HashSet<>(Arrays.asList(imageSizes))) {
+//                Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(filename,
+//                    file.getInputStream(), file.getContentType(), imageSize);
+//                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
+//            }
+//        } else {
+//            fileService.save(filename, file.getInputStream(), file.getContentType(), result);
+//        }
+        return new ResponseEntity<>(ImmutableList.of(), HttpStatus.OK);
     }
+
 
     private String getComputeFileName(HttpServletRequest request, String path, MultipartFile file) throws UnsupportedEncodingException {
         String filename;
