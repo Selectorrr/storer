@@ -33,7 +33,7 @@ public class ImageService {
         }
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         String extension = FilenameUtils.getExtension(name);
-        name = name.replace("." + extension, String.format("%sx%s.%s", targetWidth, targetHeight, extension));
+        name = name.replace(extension, String.format("%sx%s.%s", targetWidth, targetHeight, extension));
         ImageIO.write(image, extension, os);
         return Tables.immutableCell(name, contentType, new ByteArrayInputStream(os.toByteArray()));
     }

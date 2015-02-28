@@ -1,7 +1,10 @@
 package net.org.selector.storer.web.rest;
 
+import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Table;
 import com.mongodb.gridfs.GridFSDBFile;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
@@ -14,14 +17,16 @@ import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
 import org.apache.tomcat.util.http.fileupload.util.LimitedInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.bind.RelaxedPropertyResolver;
+import org.springframework.context.EnvironmentAware;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.inject.Inject;
 import javax.servlet.ServletOutputStream;
@@ -29,17 +34,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLDecoder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
 
-import static org.apache.tomcat.util.http.fileupload.IOUtils.closeQuietly;
+import static com.google.common.base.Objects.equal;
 
 /**
  * SLitvinov on 25.02.2015.
  */
 @Controller
 @RequestMapping("/files/**")
-public class FileResource extends ServletFileUpload {
+public class FileResource extends ServletFileUpload implements EnvironmentAware {
     private final Logger log = LoggerFactory.getLogger(FileResource.class);
     private static final int DEFAULT_BUFFER_SIZE = 10240; // ..bytes = 10KB.
     private static final long DEFAULT_EXPIRE_TIME = 604800000L; // ..ms = 1 week.
@@ -303,9 +311,7 @@ public class FileResource extends ServletFileUpload {
      */
     @RequestMapping(method = RequestMethod.POST)
     @ResponseBody
-    public ResponseEntity<List<String>> createOrUpdate(HttpServletRequest request,
-                                                       @RequestParam(value = "path", required = false) String path,
-                                                       @RequestParam(value = "imageSizes", required = false) String[] imageSizes) throws IOException, FileUploadException {
+    public ResponseEntity<List<String>> createOrUpdate(HttpServletRequest request) throws IOException, FileUploadException {
         ServletRequestContext ctx = new ServletRequestContext(request);
         String contentType = ctx.getContentType();
         if (!isMultipartContent(ctx)) {
@@ -313,36 +319,33 @@ public class FileResource extends ServletFileUpload {
                 "the request doesn't contain a %s or %s stream, content type header is %s",
                 MULTIPART_FORM_DATA, MULTIPART_MIXED, contentType));
         }
-
         final long requestSize = ctx.contentLength();
-
-        InputStream input; // N.B. this is eventually closed in MultipartStream processing
-//        if (sizeMax >= 0) {
-//            if (requestSize != -1 && requestSize > sizeMax) {
-//                throw new SizeLimitExceededException(String.format(
-//                    "the request was rejected because its size (%s) exceeds the configured maximum (%s)",
-//                    requestSize, sizeMax),
-//                    requestSize, sizeMax);
-//            }
-//            // N.B. this is eventually closed in MultipartStream processing
-//            input = new LimitedInputStream(ctx.getInputStream(), sizeMax) {
-//                @Override
-//                protected void raiseError(long pSizeMax, long pCount)
-//                    throws IOException {
-//                    FileUploadException ex = new SizeLimitExceededException(
-//                        String.format("the request was rejected because its size (%s) exceeds the configured maximum (%s)",
-//                            pCount, pSizeMax),
-//                        pCount, pSizeMax);
-//                    throw new FileUploadIOException(ex);
-//                }
-//            };
-//        } else {
+        InputStream input;
+        if (sizeMax >= 0) {
+            if (requestSize != -1 && requestSize > sizeMax) {
+                throw new SizeLimitExceededException(String.format(
+                    "the request was rejected because its size (%s) exceeds the configured maximum (%s)",
+                    requestSize, sizeMax),
+                    requestSize, sizeMax);
+            }
+            input = new LimitedInputStream(ctx.getInputStream(), sizeMax) {
+                @Override
+                protected void raiseError(long pSizeMax, long pCount)
+                    throws IOException {
+                    FileUploadException ex = new SizeLimitExceededException(
+                        String.format("the request was rejected because its size (%s) exceeds the configured maximum (%s)",
+                            pCount, pSizeMax),
+                        pCount, pSizeMax);
+                    throw new FileUploadIOException(ex);
+                }
+            };
+        } else {
             input = ctx.getInputStream();
-//        }
+        }
         String charEncoding = ctx.getCharacterEncoding();
         byte[] boundary = getBoundary(contentType);
         if (boundary == null) {
-            closeQuietly(input); // avoid possible resource leak
+            IOUtils.closeQuietly(input); // avoid possible resource leak
             throw new FileUploadException("the request was rejected because no multipart boundary was found");
         }
 
@@ -350,44 +353,88 @@ public class FileResource extends ServletFileUpload {
         try {
             multi = new MultipartStream(input, boundary, 4096, null);
         } catch (IllegalArgumentException iae) {
-            org.apache.tomcat.util.http.fileupload.IOUtils.closeQuietly(input); // avoid possible resource leak
+            IOUtils.closeQuietly(input); // avoid possible resource leak
             throw new InvalidContentTypeException(
                 String.format("The boundary specified in the %s header is too long", CONTENT_TYPE), iae);
         }
         multi.setHeaderEncoding(charEncoding);
-
-
         boolean nextPart = multi.skipPreamble();
-        FileItemHeaders headers = getParsedHeaders(multi.readHeaders());
-        String fieldName = getFieldName(headers);
-        String fileName = getFileName(headers);
+        String path = null;
+        List<String> imageSizes = Lists.newArrayList();
+        while (nextPart) {
+            FileItemHeaders headers = getParsedHeaders(multi.readHeaders());
+            String fieldName = getFieldName(headers);
+            if (equal(fieldName, "file")) {
+                String fileName = computeFileName(request, path, getFileName(headers));
+                String subContentType = headers.getHeader(CONTENT_TYPE);
+                PipedInputStream in = new PipedInputStream();
+                PipedOutputStream out = new PipedOutputStream(in);
+                new Thread(
+                    () -> {
+                        try {
+                            multi.readBodyData(out);
+                        } catch (IOException e) {
+                            log.error("Can't read body data", e);
+                        } finally {
+                            IOUtils.closeQuietly(out);
+                        }
+                    }
+                ).start();
+                try {
+                    List<String> result = Lists.newArrayList();
+                    if (imageSizes.size() > 0) {
+                        byte[] bytes = IOUtils.toByteArray(in);
+                        for (String imageSize : imageSizes) {
+                            Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(fileName,
+                                new ByteArrayInputStream(bytes), subContentType, imageSize);
+                            fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
+                        }
+                    } else {
+                        fileService.save(fileName, in, subContentType, result);
+                    }
 
-//        String filename = getComputeFileName(request, path, file);
-//        List<String> result = Lists.newArrayList();
-//        if (imageSizes != null && imageSizes.length > 0) {
-//            for (String imageSize : new HashSet<>(Arrays.asList(imageSizes))) {
-//                Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(filename,
-//                    file.getInputStream(), file.getContentType(), imageSize);
-//                fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
-//            }
-//        } else {
-//            fileService.save(filename, file.getInputStream(), file.getContentType(), result);
-//        }
-        return new ResponseEntity<>(ImmutableList.of(), HttpStatus.OK);
+                    return new ResponseEntity<>(result, HttpStatus.OK);
+                } finally {
+                    IOUtils.closeQuietly(in);
+                }
+            } else if (equal(fieldName, "path")) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                multi.readBodyData(out);
+                path = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
+            } else if (equal(fieldName, "imageSizes")) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                multi.readBodyData(out);
+                String sizesStr = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
+                Iterators.addAll(imageSizes, Splitter.on(',').split(sizesStr).iterator());
+            }
+            nextPart = multi.readBoundary();
+        }
+        throw new InvalidContentTypeException("the request was rejected because no file filed was found");
     }
 
 
-    private String getComputeFileName(HttpServletRequest request, String path, MultipartFile file) throws UnsupportedEncodingException {
+    private String computeFileName(HttpServletRequest request, String path, String originalFilename) throws UnsupportedEncodingException {
         String filename;
         if (!Strings.isNullOrEmpty(path)) {
             filename = URLDecoder.decode(path, "UTF-8");
         } else {
-            filename = request.getServletPath() + "/" + UUID.randomUUID().toString() + "/" + file.getOriginalFilename();
+            filename = request.getServletPath() + "/" + UUID.randomUUID().toString().replace("-", "") + "/" + originalFilename;
         }
         filename = filename.replace("//", "/");
         return filename;
     }
 
+    private long parseSize(String size) {
+        Assert.hasLength(size, "Size must not be empty");
+        size = size.toUpperCase();
+        if (size.endsWith("KB")) {
+            return Long.valueOf(size.substring(0, size.length() - 2)) * 1024;
+        }
+        if (size.endsWith("MB")) {
+            return Long.valueOf(size.substring(0, size.length() - 2)) * 1024 * 1024;
+        }
+        return Long.valueOf(size);
+    }
 
     /**
      * DELETE  /rest/files/:filename -> delete the "filename" file.
@@ -418,6 +465,12 @@ public class FileResource extends ServletFileUpload {
     private static long sublong(String value, int beginIndex, int endIndex) {
         String substring = value.substring(beginIndex, endIndex);
         return (substring.length() > 0) ? Long.parseLong(substring) : -1;
+    }
+
+    @Override
+    public void setEnvironment(Environment environment) {
+        RelaxedPropertyResolver propertyResolver = new RelaxedPropertyResolver(environment);
+        sizeMax = parseSize(propertyResolver.getProperty("upload.maxFileSize", String.class, "-1"));
     }
 
     protected class Range {

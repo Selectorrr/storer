@@ -1,10 +1,7 @@
 # Disable Jolokia - An http/json bridge for remote JMX access
 endpoints.jolokia.enabled: false
-
-multipart.maxFileSize: 1024MB
-multipart.maxRequestSize: 1024MB
-multipart/form-data: 1024MB
-multipart.fileSizeThreshold: 10MB
+upload:
+    maxFileSize: 1024MB
 
 async:
     corePoolSize: 2
