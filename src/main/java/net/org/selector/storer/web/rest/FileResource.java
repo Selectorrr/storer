@@ -441,9 +441,10 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
      * DELETE  /rest/files/:filename -> delete the "filename" file.
      */
     @RequestMapping(method = RequestMethod.DELETE)
-    public void delete(HttpServletRequest request) {
+    public ResponseEntity<Void> delete(HttpServletRequest request) {
         log.debug("REST request to delete file : {}", request.getRequestURL().toString());
         fileService.delete(request.getRequestURL().toString());
+        return ResponseEntity.ok().build();
     }
 
     private static boolean matches(String matchHeader, String toMatch) {
