@@ -443,7 +443,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
      */
     @RequestMapping(method = RequestMethod.DELETE)
     public ResponseEntity<Void> delete(HttpServletRequest request) throws UnsupportedEncodingException {
-        String filename = URLDecoder.decode(request.getRequestURL().toString(), Charsets.UTF_8.name());
+        String filename = request.getServletPath();
         log.debug("REST request to delete file : {}", filename);
         fileService.delete(filename);
         return ResponseEntity.ok().build();
