@@ -8,6 +8,7 @@ import com.google.common.collect.Table;
 import com.mongodb.gridfs.GridFSDBFile;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.tomcat.util.http.fileupload.FileItemHeaders;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;
@@ -89,7 +90,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
         }
 
         // Prepare some variables. The ETag is an unique identifier of the file.
-        String fileName = file.getFilename();
+        String fileName = FilenameUtils.getName(file.getFilename());
         long length = file.getLength();
         long lastModified = file.getUploadDate().getTime();
         String eTag = fileName + "_" + length + "_" + lastModified;
