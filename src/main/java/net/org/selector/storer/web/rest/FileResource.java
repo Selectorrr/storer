@@ -1,5 +1,6 @@
 package net.org.selector.storer.web.rest;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
@@ -441,9 +442,10 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
      * DELETE  /rest/files/:filename -> delete the "filename" file.
      */
     @RequestMapping(method = RequestMethod.DELETE)
-    public ResponseEntity<Void> delete(HttpServletRequest request) {
-        log.debug("REST request to delete file : {}", request.getRequestURL().toString());
-        fileService.delete(request.getRequestURL().toString());
+    public ResponseEntity<Void> delete(HttpServletRequest request) throws UnsupportedEncodingException {
+        String filename = URLDecoder.decode(request.getRequestURL().toString(), Charsets.UTF_8.name());
+        log.debug("REST request to delete file : {}", filename);
+        fileService.delete(filename);
         return ResponseEntity.ok().build();
     }
 
