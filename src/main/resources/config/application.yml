@@ -1,7 +1,7 @@
 # Disable Jolokia - An http/json bridge for remote JMX access
 endpoints.jolokia.enabled: false
 upload:
-    maxFileSize: 1024MB
+    maxFileSize: -1
 
 async:
     corePoolSize: 2
