@@ -10,5 +10,5 @@ spring:
             port: 27017
             database: storer
 files:
-    unusedLiveInHours: 3600000
+    unusedLiveInMillis: 3600000
 
