@@ -10,6 +10,6 @@ spring:
             port: 27017
             database: storer
 files:
-    unusedLiveInMillis: 600000
+    unusedLiveInMillis: 60000
 
 
