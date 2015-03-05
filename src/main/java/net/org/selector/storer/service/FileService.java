@@ -1,10 +1,6 @@
 package net.org.selector.storer.service;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
-import net.org.selector.storer.domain.Prop;
-import net.org.selector.storer.repository.FilePropsRepository;
 import org.joda.time.DateTime;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
@@ -12,7 +8,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.gridfs.GridFsTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.inject.Inject;
@@ -28,8 +23,6 @@ public class FileService implements EnvironmentAware {
     private GridFsTemplate gridFsTemplate;
     private static final String ENV_FILES = "files.";
     private RelaxedPropertyResolver propertyResolver;
-    @Inject
-    private FilePropsRepository filePropsRepository;
 
 
     public void save(String filename, InputStream inputStream, String contentType, List<String> result) {
@@ -50,31 +43,12 @@ public class FileService implements EnvironmentAware {
         return gridFsTemplate.findOne(criteria);
     }
 
-    @Scheduled(cron = "1 * * * * ?")
-    public void clearUnusedFiles() {
-        Prop lastSync = filePropsRepository.findOne("lastSync");
-//        DateTime deadTime = new DateTime(lastSync.getValue()).plusMillis(unusedLiveInMillis);
+    public void actualize(List<String> names) {
+        Integer tmpTimeout = propertyResolver.getProperty("tmpTimeout", Integer.class, 3600000);
         gridFsTemplate.delete(new Query()
-            .addCriteria(Criteria
-                    .where("metadata.deleteTime").lt(new DateTime(lastSync.getValue()).getMillis())
-//                    .orOperator(
-//                        Criteria.where("metadata.deleteTime").exists(false)
-//                            .andOperator(
-//                                Criteria.where("uploadDate").lt(new DateTime().minusMillis(unusedLiveInMillis).toDate())
-//                            )
-//                    )
-            ));
-    }
-
-    public void markAsUsed(List<String> names) {
-        List<GridFSDBFile> unusedFiles = gridFsTemplate.find(new Query().addCriteria(Criteria.where("filename").in(names)));
-        DBObject metaData = new BasicDBObject();
-        Integer unusedLiveInMillis = propertyResolver.getProperty("unusedLiveInMillis", Integer.class, 3600000);
-        metaData.put("deleteTime", new DateTime().getMillis() + unusedLiveInMillis);
-        for (GridFSDBFile unusedFile : unusedFiles) {
-            unusedFile.setMetaData(metaData);
-            unusedFile.save();
-        }
+                .addCriteria(Criteria.where("filename").nin(names))
+                .addCriteria(Criteria.where("uploadDate").lt(new DateTime().minusMillis(tmpTimeout).toDate()))
+        );
     }
 
     @Override

@@ -1,10 +1,6 @@
 package net.org.selector.storer.web.rest;
 
-import net.org.selector.storer.domain.Prop;
-import net.org.selector.storer.repository.FilePropsRepository;
 import net.org.selector.storer.service.FileService;
-import org.joda.time.DateTime;
-import org.joda.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,14 +19,11 @@ import java.util.Arrays;
 public class ControlFileResource {
     @Inject
     private FileService fileService;
-    @Inject
-    private FilePropsRepository filePropsRepository;
 
-    @RequestMapping(value = "/markAsUsed", method = RequestMethod.POST)
+    @RequestMapping(value = "/actualize", method = RequestMethod.POST)
     @ResponseBody
     public ResponseEntity<Void> markAsUsed(@RequestBody String[] files) {
-        fileService.markAsUsed(Arrays.asList(files));
-        filePropsRepository.save(new Prop("lastSync", new LocalDateTime()));
+        fileService.actualize(Arrays.asList(files));
         return ResponseEntity.ok().build();
     }
 }
