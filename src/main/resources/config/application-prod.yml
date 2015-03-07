@@ -8,7 +8,7 @@ spring:
         mongodb:
             host: localhost
             port: 27017
-            database: storer
+            database: cam
 files:
-    unusedLiveInMillis: 3600000
+    unusedLiveInMillis: 7200000
 

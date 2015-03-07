@@ -8,8 +8,8 @@ spring:
         mongodb:
             host: localhost
             port: 27017
-            database: storer
+            database: cam
 files:
-    tmpTimeout: 120000
+    tmpTimeout: 7200000
 
 

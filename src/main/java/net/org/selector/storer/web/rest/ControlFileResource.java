@@ -22,8 +22,22 @@ public class ControlFileResource {
 
     @RequestMapping(value = "/actualize", method = RequestMethod.POST)
     @ResponseBody
-    public ResponseEntity<Void> markAsUsed(@RequestBody String[] files) {
+    public ResponseEntity<Void> actualize(@RequestBody String[] files) {
         fileService.actualize(Arrays.asList(files));
+        return ResponseEntity.ok().build();
+    }
+
+    @RequestMapping(value = "/markAsUsed", method = RequestMethod.POST)
+    @ResponseBody
+    public ResponseEntity<Void> markAsUsed(@RequestBody String[] files) {
+        fileService.markAsUsed(Arrays.asList(files));
+        return ResponseEntity.ok().build();
+    }
+
+    @RequestMapping(value = "/delete", method = RequestMethod.POST)
+    @ResponseBody
+    public ResponseEntity<Void> delete(@RequestBody String[] files) {
+        fileService.delete(Arrays.asList(files));
         return ResponseEntity.ok().build();
     }
 }
