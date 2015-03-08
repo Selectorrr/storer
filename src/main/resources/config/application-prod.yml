@@ -10,5 +10,5 @@ spring:
             port: 27017
             database: cam
 files:
-    unusedLiveInMillis: 7200000
+    tmpTimeout: 7200000
 
