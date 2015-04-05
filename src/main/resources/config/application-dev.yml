@@ -12,4 +12,5 @@ spring:
 files:
     tmpTimeout: 7200000
 
-
+site:
+    userDetailsUrl: http://localhost:8080/api/userDetails/
