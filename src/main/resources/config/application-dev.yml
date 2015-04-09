@@ -4,13 +4,13 @@ server:
 spring:
     profiles:
         active: dev
-    data:
-        mongodb:
-            host: localhost
-            port: 27017
-            database: cam
 files:
     tmpTimeout: 7200000
 
-site:
-    userDetailsUrl: http://localhost:8080/api/userDetails/
+sites:
+    petsroom:
+        db:
+            host: localhost
+            port: 27017
+            database: cam
+
