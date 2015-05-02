@@ -14,6 +14,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Objects;
 
@@ -38,12 +39,7 @@ public class XAuthTokenFilter extends GenericFilterBean {
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         try {
             HttpServletRequest httpServletRequest = (HttpServletRequest) servletRequest;
-            String authToken = null;
-            for (Cookie cookie : httpServletRequest.getCookies()) {
-                if (Objects.equals(cookie.getName(), XAUTH_TOKEN_HEADER_NAME)) {
-                    authToken = StringUtils.substringBetween(URLDecoder.decode(cookie.getValue(), "UTF-8"), "\"");
-                }
-            }
+            String authToken = getAuthToken(httpServletRequest);
             if (StringUtils.isNotBlank(authToken)) {
                 String username = this.tokenProvider.getUserNameFromToken(authToken);
                 UserDetails details = this.detailsService.loadUserByUsername(username);
@@ -56,5 +52,18 @@ public class XAuthTokenFilter extends GenericFilterBean {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    private String getAuthToken(HttpServletRequest httpServletRequest) throws UnsupportedEncodingException {
+        String authToken = null;
+        if (httpServletRequest.getCookies() == null) {
+            return null;
+        }
+        for (Cookie cookie : httpServletRequest.getCookies()) {
+            if (Objects.equals(cookie.getName(), XAUTH_TOKEN_HEADER_NAME)) {
+                authToken = StringUtils.substringBetween(URLDecoder.decode(cookie.getValue(), "UTF-8"), "\"");
+            }
+        }
+        return authToken;
     }
 }

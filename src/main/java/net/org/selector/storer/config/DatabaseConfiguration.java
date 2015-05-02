@@ -2,10 +2,7 @@ package net.org.selector.storer.config;
 
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 import com.mongodb.Mongo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +23,7 @@ import java.util.Set;
 
 @Configuration
 public class DatabaseConfiguration implements EnvironmentAware {
-    private Set<String> siteNames = Sets.newHashSet();
+    private ImmutableSet<String> siteNames;
     private RelaxedPropertyResolver propertyResolver;
     private Set<AbstractMongoConfiguration> configurations = Sets.newHashSet();
     private final Logger log = LoggerFactory.getLogger(DatabaseConfiguration.class);
@@ -35,13 +32,18 @@ public class DatabaseConfiguration implements EnvironmentAware {
 
 
     @Bean
-    public ImmutableMap<String, GridFsTemplate> gridFsTemplateRegister() throws Exception {
+    public ImmutableMap<String, GridFsTemplate> gridFsTemplateRegister() {
         return gridFsTemplateRegister;
     }
 
     @Bean
-    public ImmutableMap<String, MongoTemplate> mongoTemplateRegister() throws Exception {
+    public ImmutableMap<String, MongoTemplate> mongoTemplateRegister() {
         return mongoTemplateRegister;
+    }
+
+    @Bean
+    public ImmutableSet<String> siteNames() {
+        return siteNames;
     }
 
     private MongoProperties getMongoProperties(String dbPrefix) {
@@ -101,9 +103,11 @@ public class DatabaseConfiguration implements EnvironmentAware {
     public void setEnvironment(Environment environment) {
         propertyResolver = new RelaxedPropertyResolver(environment);
         Map<String, Object> sites = propertyResolver.getSubProperties("sites");
+        Set<String> result = Sets.newHashSet();
         for (Map.Entry<String, Object> entry : sites.entrySet()) {
             Iterable<String> split = Splitter.on('.').split(entry.getKey());
-            siteNames.add(Iterables.get(split, 1));
+            result.add(Iterables.get(split, 1));
         }
+        siteNames = ImmutableSet.copyOf(result);
     }
 }

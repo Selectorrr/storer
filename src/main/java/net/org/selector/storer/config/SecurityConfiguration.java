@@ -1,7 +1,6 @@
 package net.org.selector.storer.config;
 
 
-import net.org.selector.storer.security.AuthoritiesConstants;
 import net.org.selector.storer.security.Http401UnauthorizedEntryPoint;
 import net.org.selector.storer.security.xauth.TokenProvider;
 import net.org.selector.storer.security.xauth.XAuthTokenConfigurer;
@@ -9,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.repository.query.spi.EvaluationContextExtension;
 import org.springframework.data.repository.query.spi.EvaluationContextExtensionSupport;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.access.expression.SecurityExpressionRoot;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -57,7 +57,10 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
             .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
             .authorizeRequests()
-            .antMatchers("/files/**").hasAuthority(AuthoritiesConstants.ADMIN)
+            .antMatchers(HttpMethod.GET, "/files/**").permitAll()
+            .antMatchers(HttpMethod.POST, "/files/**").authenticated()
+            .antMatchers(HttpMethod.DELETE, "/files/**").authenticated()
+            .antMatchers("/api/files/**").authenticated()
             .and()
             .apply(securityConfigurerAdapter());
 

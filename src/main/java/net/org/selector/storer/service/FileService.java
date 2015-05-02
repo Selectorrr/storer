@@ -1,8 +1,15 @@
 package net.org.selector.storer.service;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
+import net.org.selector.storer.security.AuthoritiesConstants;
+import net.org.selector.storer.security.SecurityUtils;
+import net.org.selector.storer.service.util.RequestInfoUtil;
 import org.joda.time.DateTime;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
@@ -23,40 +30,56 @@ import java.util.List;
 @Service
 public class FileService implements EnvironmentAware {
     @Inject
-    private GridFsTemplate gridFsTemplate;
+    private ImmutableMap<String, GridFsTemplate> gridFsTemplateRegister;
+    @Inject
+    private ImmutableSet<String> siteNames;
     private static final String ENV_FILES = "files.";
     private Integer tmpTimeout;
 
 
     public void save(String filename, InputStream inputStream, String contentType, List<String> result) {
-        Query byName = new Query().addCriteria(Criteria.where("filename").is(filename));
-        gridFsTemplate.delete(byName);
-        gridFsTemplate.store(inputStream, filename, contentType);
+        GridFsTemplate gridFsTemplate = gridFsTemplateRegister.get(RequestInfoUtil.getSiteName());
+        Query query = new Query().addCriteria(Criteria.where("filename").is(filename));
+        List<GridFSDBFile> existFiles = gridFsTemplate.find(query);
+        if (existFiles.size() > 0) {
+            throw new IllegalArgumentException(String.format("file with name %s already exist", filename));
+        }
+        gridFsTemplate.store(inputStream, filename, contentType, getOwnerMetadata());
         result.add(filename);
     }
 
     public void delete(String s) {
-        Query filename = new Query().addCriteria(Criteria.where("filename").is(s));
-        gridFsTemplate.delete(filename);
+        delete(ImmutableList.of(s));
     }
 
     public void delete(List<String> s) {
-        Query filename = new Query().addCriteria(Criteria.where("filename").in(s));
-        gridFsTemplate.delete(filename);
+        GridFsTemplate gridFsTemplate = gridFsTemplateRegister.get(RequestInfoUtil.getSiteName());
+        Query query = new Query()
+            .addCriteria(Criteria.where("filename").in(s));
+        if (!SecurityUtils.isUserInRole(AuthoritiesConstants.ADMIN)) {
+            query.addCriteria(Criteria.where("metadata.owner").is(SecurityUtils.getCurrentLogin()));
+        }
+        List<GridFSDBFile> existFiles = gridFsTemplate.find(query);
+        if (existFiles.size() != s.size()) {
+            throw new IllegalArgumentException(String.format("file with name %s and owner %s not found", s,
+                SecurityUtils.getCurrentLogin()));
+        }
+        gridFsTemplate.delete(query);
     }
 
 
     public GridFSDBFile findOneByName(String filename) {
+        GridFsTemplate gridFsTemplate = gridFsTemplateRegister.get(RequestInfoUtil.getSiteName());
         Query criteria = new Query().addCriteria(Criteria.where("filename").is(filename));
         return gridFsTemplate.findOne(criteria);
     }
 
-    public void actualize(List<String> names) {
-        gridFsTemplate.delete(new Query()
-                .addCriteria(Criteria.where("filename").nin(names))
-                .addCriteria(Criteria.where("uploadDate").lt(new DateTime().minusMillis(tmpTimeout).toDate()))
-        );
-    }
+//    public void actualize(List<String> names) {
+//        gridFsTemplateRegister.get(RequestInfoUtil.getSiteName()).delete(new Query()
+//                .addCriteria(Criteria.where("filename").nin(names))
+//                .addCriteria(Criteria.where("uploadDate").lt(new DateTime().minusMillis(tmpTimeout).toDate()))
+//        );
+//    }
 
     @Override
     public void setEnvironment(Environment environment) {
@@ -66,10 +89,15 @@ public class FileService implements EnvironmentAware {
 
 
     public void markAsUsed(List<String> names) {
-        List<GridFSDBFile> unusedFiles = gridFsTemplate.find(new Query().addCriteria(Criteria.where("filename").in(names)));
-        DBObject metaData = new BasicDBObject();
-        metaData.put("used", true);
+        Query query = new Query().addCriteria(Criteria.where("filename").in(names));
+        if (!SecurityUtils.isUserInRole(AuthoritiesConstants.ADMIN)) {
+            query.addCriteria(Criteria.where("metadata.owner").is(SecurityUtils.getCurrentLogin()));
+        }
+        List<GridFSDBFile> unusedFiles = gridFsTemplateRegister.get(RequestInfoUtil.getSiteName())
+            .find(query);
         for (GridFSDBFile unusedFile : unusedFiles) {
+            DBObject metaData = Objects.firstNonNull(unusedFile.getMetaData(), new BasicDBObject());
+            metaData.put("used", true);
             unusedFile.setMetaData(metaData);
             unusedFile.save();
         }
@@ -77,9 +105,17 @@ public class FileService implements EnvironmentAware {
 
     @Scheduled(fixedDelay = 600000)
     public void clearUnusedFiles() {
-        gridFsTemplate.delete(new Query()
-                .addCriteria(Criteria.where("metadata.used").exists(false))
-                .addCriteria(Criteria.where("uploadDate").lt(new DateTime().minusMillis(tmpTimeout).toDate()))
-        );
+        for (String siteName : siteNames) {
+            gridFsTemplateRegister.get(siteName).delete(new Query()
+                    .addCriteria(Criteria.where("metadata.used").exists(false))
+                    .addCriteria(Criteria.where("uploadDate").lt(new DateTime().minusMillis(tmpTimeout).toDate()))
+            );
+        }
+    }
+
+    private DBObject getOwnerMetadata() {
+        DBObject metadata = new BasicDBObject();
+        metadata.put("owner", SecurityUtils.getCurrentLogin());
+        return metadata;
     }
 }
