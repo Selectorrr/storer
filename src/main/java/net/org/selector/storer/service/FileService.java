@@ -8,11 +8,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSFile;
-import net.org.selector.storer.domain.FileInfo;
 import net.org.selector.storer.security.AuthoritiesConstants;
 import net.org.selector.storer.security.SecurityUtils;
 import net.org.selector.storer.service.util.RequestInfoUtil;
-import org.apache.commons.io.FilenameUtils;
 import org.joda.time.DateTime;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
@@ -40,15 +38,14 @@ public class FileService implements EnvironmentAware {
     private Integer tmpTimeout;
 
 
-    public void save(String filename, InputStream inputStream, String contentType, List<FileInfo> result) {
+    public GridFSFile save(String filename, InputStream inputStream, String contentType) {
         GridFsTemplate gridFsTemplate = gridFsTemplateRegister.get(RequestInfoUtil.getSiteName());
         Query query = new Query().addCriteria(Criteria.where("filename").is(filename));
         List<GridFSDBFile> existFiles = gridFsTemplate.find(query);
         if (existFiles.size() > 0) {
             throw new IllegalArgumentException(String.format("file with name %s already exist", filename));
         }
-        GridFSFile file = gridFsTemplate.store(inputStream, filename, contentType, getOwnerMetadata());
-        result.add(new FileInfo(FilenameUtils.getName(filename), filename, String.valueOf(file.getLength())));
+        return gridFsTemplate.store(inputStream, filename, contentType, getOwnerMetadata());
     }
 
     public void delete(String s) {

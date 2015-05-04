@@ -7,6 +7,8 @@ public class FileInfo {
     private String name;
     private String url;
     private String size;
+    private String height;
+    private String width;
 
     public FileInfo() {
     }
@@ -41,6 +43,22 @@ public class FileInfo {
         this.size = size;
     }
 
+    public String getHeight() {
+        return height;
+    }
+
+    public void setHeight(String height) {
+        this.height = height;
+    }
+
+    public String getWidth() {
+        return width;
+    }
+
+    public void setWidth(String width) {
+        this.width = width;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -50,7 +68,9 @@ public class FileInfo {
 
         if (name != null ? !name.equals(fileInfo.name) : fileInfo.name != null) return false;
         if (url != null ? !url.equals(fileInfo.url) : fileInfo.url != null) return false;
-        return !(size != null ? !size.equals(fileInfo.size) : fileInfo.size != null);
+        if (size != null ? !size.equals(fileInfo.size) : fileInfo.size != null) return false;
+        if (height != null ? !height.equals(fileInfo.height) : fileInfo.height != null) return false;
+        return !(width != null ? !width.equals(fileInfo.width) : fileInfo.width != null);
 
     }
 
@@ -59,6 +79,8 @@ public class FileInfo {
         int result = name != null ? name.hashCode() : 0;
         result = 31 * result + (url != null ? url.hashCode() : 0);
         result = 31 * result + (size != null ? size.hashCode() : 0);
+        result = 31 * result + (height != null ? height.hashCode() : 0);
+        result = 31 * result + (width != null ? width.hashCode() : 0);
         return result;
     }
 }

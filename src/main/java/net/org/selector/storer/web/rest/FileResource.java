@@ -4,9 +4,10 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Table;
 import com.mongodb.gridfs.GridFSDBFile;
+import com.mongodb.gridfs.GridFSFile;
 import net.org.selector.storer.domain.FileInfo;
+import net.org.selector.storer.domain.ResizeInfo;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
 import org.apache.commons.io.FilenameUtils;
@@ -387,12 +388,17 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                     if (imageSizes.size() > 0) {
                         byte[] bytes = IOUtils.toByteArray(in);
                         for (String imageSize : imageSizes) {
-                            Table.Cell<String, String, InputStream> imageResult = imageService.resizeImage(fileName,
+                            ResizeInfo resizeInfo = imageService.resizeImage(fileName,
                                 new ByteArrayInputStream(bytes), subContentType, imageSize);
-                            fileService.save(imageResult.getRowKey(), imageResult.getValue(), imageResult.getColumnKey(), result);
+                            GridFSFile file = fileService.save(resizeInfo.getName(), resizeInfo.getByteArrayInputStream(), resizeInfo.getContentType());
+                            FileInfo fileInfo = new FileInfo(FilenameUtils.getName(resizeInfo.getName()), resizeInfo.getName(), String.valueOf(file.getLength()));
+                            fileInfo.setHeight(resizeInfo.getHeight());
+                            fileInfo.setWidth(resizeInfo.getWidth());
+                            result.add(fileInfo);
                         }
                     } else {
-                        fileService.save(fileName, in, subContentType, result);
+                        GridFSFile file = fileService.save(fileName, in, subContentType);
+                        result.add(new FileInfo(FilenameUtils.getName(fileName), fileName, String.valueOf(file.getLength())));
                     }
 
                     return new ResponseEntity<>(result, HttpStatus.OK);
