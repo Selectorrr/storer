@@ -26,9 +26,16 @@ public class ImageService {
         int targetHeight = Integer.parseInt(Iterables.get(sizes, 1));
         BufferedImage image = ImageIO.read(input);
         if (image.getWidth() > targetWidth || image.getHeight() > targetHeight) {
-            image = Scalr.resize(image, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_HEIGHT, targetWidth, targetHeight, Scalr.OP_ANTIALIAS);
+            if (image.getWidth() < image.getHeight()) {
+                image = Scalr.resize(image, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_WIDTH, targetWidth, targetHeight, Scalr.OP_ANTIALIAS);
+            } else {
+                image = Scalr.resize(image, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_HEIGHT, targetWidth, targetHeight, Scalr.OP_ANTIALIAS);
+            }
             if (image.getWidth() > targetWidth) {
                 image = Scalr.crop(image, (image.getWidth() - targetWidth) / 2, 0, targetWidth, targetHeight);
+            }
+            if (image.getHeight() > targetHeight) {
+                image = Scalr.crop(image, 0, (image.getHeight() - targetHeight) / 2, targetWidth, targetHeight);
             }
         }
         ByteArrayOutputStream os = new ByteArrayOutputStream();

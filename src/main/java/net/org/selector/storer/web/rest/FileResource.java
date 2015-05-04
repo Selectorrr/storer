@@ -1,12 +1,12 @@
 package net.org.selector.storer.web.rest;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Table;
 import com.mongodb.gridfs.GridFSDBFile;
+import net.org.selector.storer.domain.FileInfo;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
 import org.apache.commons.io.FilenameUtils;
@@ -313,7 +313,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
      */
     @RequestMapping(method = RequestMethod.POST)
     @ResponseBody
-    public ResponseEntity<List<String>> createOrUpdate(HttpServletRequest request) throws IOException, FileUploadException {
+    public ResponseEntity<List<FileInfo>> createOrUpdate(HttpServletRequest request) throws IOException, FileUploadException {
         ServletRequestContext ctx = new ServletRequestContext(request);
         String contentType = ctx.getContentType();
         if (!isMultipartContent(ctx)) {
@@ -383,7 +383,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                     }
                 ).start();
                 try {
-                    List<String> result = Lists.newArrayList();
+                    List<FileInfo> result = Lists.newArrayList();
                     if (imageSizes.size() > 0) {
                         byte[] bytes = IOUtils.toByteArray(in);
                         for (String imageSize : imageSizes) {
