@@ -23,7 +23,7 @@ public final class RequestInfoUtil {
             result = Iterables.get(urlParts, 2, "");
         }
         if (Strings.isNullOrEmpty(result)) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("site name not specified");
         }
         return result;
     }
