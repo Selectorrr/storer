@@ -4,15 +4,25 @@ package net.org.selector.storer.domain;
  * Created by Selector on 04.05.2015.
  */
 public class FileInfo {
+    private String name;
     private String url;
     private String size;
 
     public FileInfo() {
     }
 
-    public FileInfo(String url, String size) {
+    public FileInfo(String name, String url, String size) {
+        this.name = name;
         this.url = url;
         this.size = size;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getUrl() {
@@ -38,6 +48,7 @@ public class FileInfo {
 
         FileInfo fileInfo = (FileInfo) o;
 
+        if (name != null ? !name.equals(fileInfo.name) : fileInfo.name != null) return false;
         if (url != null ? !url.equals(fileInfo.url) : fileInfo.url != null) return false;
         return !(size != null ? !size.equals(fileInfo.size) : fileInfo.size != null);
 
@@ -45,7 +56,8 @@ public class FileInfo {
 
     @Override
     public int hashCode() {
-        int result = url != null ? url.hashCode() : 0;
+        int result = name != null ? name.hashCode() : 0;
+        result = 31 * result + (url != null ? url.hashCode() : 0);
         result = 31 * result + (size != null ? size.hashCode() : 0);
         return result;
     }
