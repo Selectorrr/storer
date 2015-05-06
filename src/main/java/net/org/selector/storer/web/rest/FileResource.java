@@ -2,6 +2,7 @@ package net.org.selector.storer.web.rest;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.mongodb.gridfs.GridFSDBFile;
@@ -367,7 +368,16 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
         while (nextPart) {
             FileItemHeaders headers = getParsedHeaders(multi.readHeaders());
             String fieldName = getFieldName(headers);
-            if (equal(fieldName, "file")) {
+            if (equal(fieldName, "path")) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                multi.readBodyData(out);
+                path = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
+            } else if (equal(fieldName, "imageSizes")) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                multi.readBodyData(out);
+                String sizesStr = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
+                Iterators.addAll(imageSizes, Splitter.on(',').split(sizesStr).iterator());
+            } else if (equal(fieldName, "file")) {
                 String fileName = computeFileName(request, path, getFileName(headers));
                 String subContentType = headers.getHeader(CONTENT_TYPE);
                 PipedInputStream in = new PipedInputStream();
@@ -387,9 +397,15 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                     List<FileInfo> result = Lists.newArrayList();
                     if (imageSizes.size() > 0) {
                         byte[] bytes = IOUtils.toByteArray(in);
+                        String mode = null;
                         for (String imageSize : imageSizes) {
+                            if (imageSize.contains(":")) {
+                                Iterable<String> imageSizeAndMode = Splitter.on(":").split(imageSize);
+                                imageSize = Iterables.getFirst(imageSizeAndMode, null);
+                                mode = Iterables.get(imageSizeAndMode, 1);
+                            }
                             ResizeInfo resizeInfo = imageService.resizeImage(fileName,
-                                new ByteArrayInputStream(bytes), subContentType, imageSize);
+                                new ByteArrayInputStream(bytes), subContentType, imageSize, mode);
                             GridFSFile file = fileService.save(resizeInfo.getName(), resizeInfo.getByteArrayInputStream(), resizeInfo.getContentType());
                             FileInfo fileInfo = new FileInfo(FilenameUtils.getName(resizeInfo.getName()), resizeInfo.getName(), String.valueOf(file.getLength()));
                             fileInfo.setHeight(resizeInfo.getHeight());
@@ -405,15 +421,6 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                 } finally {
                     IOUtils.closeQuietly(in);
                 }
-            } else if (equal(fieldName, "path")) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                multi.readBodyData(out);
-                path = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
-            } else if (equal(fieldName, "imageSizes")) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                multi.readBodyData(out);
-                String sizesStr = URLDecoder.decode(new String(out.toByteArray()), "UTF-8");
-                Iterators.addAll(imageSizes, Splitter.on(',').split(sizesStr).iterator());
             }
             nextPart = multi.readBoundary();
         }
