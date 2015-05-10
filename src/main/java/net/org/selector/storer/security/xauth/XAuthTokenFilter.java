@@ -1,6 +1,8 @@
 package net.org.selector.storer.security.xauth;
 
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,6 +32,8 @@ public class XAuthTokenFilter extends GenericFilterBean {
 
     private TokenProvider tokenProvider;
 
+    private final Logger log = LoggerFactory.getLogger(XAuthTokenFilter.class);
+
     public XAuthTokenFilter(UserDetailsService detailsService, TokenProvider tokenProvider) {
         this.detailsService = detailsService;
         this.tokenProvider = tokenProvider;
@@ -48,10 +52,10 @@ public class XAuthTokenFilter extends GenericFilterBean {
                     SecurityContextHolder.getContext().setAuthentication(token);
                 }
             }
-            filterChain.doFilter(servletRequest, servletResponse);
         } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            log.error("set authentication error", ex);
         }
+        filterChain.doFilter(servletRequest, servletResponse);
     }
 
     private String getAuthToken(HttpServletRequest httpServletRequest) throws UnsupportedEncodingException {
