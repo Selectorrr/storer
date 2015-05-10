@@ -1,0 +1,7 @@
+#! /bin/sh
+
+cd /var/log/service/storer
+
+svlogd -tt /var/log/service/storer
+
+#/sbin/chpst -u logger.
