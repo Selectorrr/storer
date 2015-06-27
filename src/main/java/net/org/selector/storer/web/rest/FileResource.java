@@ -276,7 +276,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                 response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT); // 206.
 
                 // Copy single part range.
-                IOUtils.copyLarge(input, output, r.start, r.end);
+                IOUtils.copyLarge(input, output, r.start, r.length);
             } else {
 
                 // Return multiple parts of file.
@@ -296,7 +296,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
                     sos.println("Content-Range: bytes " + r.start + "-" + r.end + "/" + r.total);
 
                     // Copy single part range of multi part range.
-                    IOUtils.copyLarge(input, output, r.start, r.end);
+                    IOUtils.copyLarge(input, output, r.start, r.length);
                 }
 
                 // End with multipart boundary.
