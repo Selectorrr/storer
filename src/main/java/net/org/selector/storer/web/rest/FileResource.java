@@ -9,10 +9,12 @@ import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSFile;
 import net.org.selector.storer.domain.FileInfo;
 import net.org.selector.storer.domain.ResizeInfo;
+import net.org.selector.storer.domain.SequenceId;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.tomcat.util.http.fileupload.FileItemHeaders;
 import org.apache.tomcat.util.http.fileupload.FileUploadException;
 import org.apache.tomcat.util.http.fileupload.MultipartStream;
@@ -24,6 +26,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -41,7 +48,6 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
 
 import static com.google.common.base.Objects.equal;
@@ -59,6 +65,8 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
 
     @Inject
     private FileService fileService;
+    @Inject
+    private MongoOperations mongoOperation;
     @Inject
     private ImageService imageService;
     private long sizeMax = -1;
@@ -433,7 +441,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
         if (!Strings.isNullOrEmpty(path)) {
             filename = URLDecoder.decode(path, "UTF-8");
         } else {
-            filename = request.getServletPath() + "/" + UUID.randomUUID().toString().replace("-", "") + "/" + originalFilename;
+            filename = request.getServletPath() + "/" + getNextSequenceId("file") + "/" + RandomStringUtils.randomAlphanumeric(5) + "/" + originalFilename;
         }
         filename = filename.replace("//", "/");
         return filename;
@@ -524,6 +532,38 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
         return Arrays.binarySearch(acceptValues, toAccept) > -1
             || Arrays.binarySearch(acceptValues, toAccept.replaceAll("/.*$", "/*")) > -1
             || Arrays.binarySearch(acceptValues, "*/*") > -1;
+    }
+
+
+    public long getNextSequenceId(String key) {
+
+        //get sequence id
+        Query query = new Query(Criteria.where("_id").is(key));
+
+        //increase sequence id by 1
+        Update update = new Update();
+        update.inc("seq", 1);
+
+        //return new increased id
+        FindAndModifyOptions options = new FindAndModifyOptions();
+        options.returnNew(true);
+
+        //this is the magic happened.
+        SequenceId seqId =
+            mongoOperation.findAndModify(query, update, options, SequenceId.class);
+
+        //if no id, throws SequenceException
+        //optional, just a way to tell user when the sequence id is failed to generate.
+        if (seqId == null) {
+            SequenceId sequenceId = new SequenceId();
+            sequenceId.setId(key);
+            sequenceId.setSeq(0);
+            mongoOperation.save(sequenceId);
+            seqId = sequenceId;
+        }
+
+        return seqId.getSeq();
+
     }
 
 }
