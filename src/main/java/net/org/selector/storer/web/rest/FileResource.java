@@ -2,6 +2,7 @@ package net.org.selector.storer.web.rest;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
@@ -12,6 +13,7 @@ import net.org.selector.storer.domain.ResizeInfo;
 import net.org.selector.storer.domain.SequenceId;
 import net.org.selector.storer.service.FileService;
 import net.org.selector.storer.service.ImageService;
+import net.org.selector.storer.service.util.RequestInfoUtil;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.RandomStringUtils;
@@ -27,7 +29,7 @@ import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
-import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -66,10 +68,10 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
     @Inject
     private FileService fileService;
     @Inject
-    private MongoOperations mongoOperation;
-    @Inject
     private ImageService imageService;
     private long sizeMax = -1;
+    @Inject
+    private ImmutableMap<String, MongoTemplate> mongoTemplateRegister;
 
     /**
      * GET  /rest/files/:filename -> get the "filename" file.
@@ -536,6 +538,8 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
 
 
     public long getNextSequenceId(String key) {
+        String siteName = RequestInfoUtil.getSiteName();
+        MongoTemplate mongoTemplate = mongoTemplateRegister.get(siteName);
 
         //get sequence id
         Query query = new Query(Criteria.where("_id").is(key));
@@ -550,7 +554,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
 
         //this is the magic happened.
         SequenceId seqId =
-            mongoOperation.findAndModify(query, update, options, SequenceId.class);
+            mongoTemplate.findAndModify(query, update, options, SequenceId.class);
 
         //if no id, throws SequenceException
         //optional, just a way to tell user when the sequence id is failed to generate.
@@ -558,7 +562,7 @@ public class FileResource extends ServletFileUpload implements EnvironmentAware 
             SequenceId sequenceId = new SequenceId();
             sequenceId.setId(key);
             sequenceId.setSeq(0);
-            mongoOperation.save(sequenceId);
+            mongoTemplate.save(sequenceId);
             seqId = sequenceId;
         }
 
