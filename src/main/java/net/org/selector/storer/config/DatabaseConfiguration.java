@@ -6,11 +6,13 @@ import com.google.common.collect.*;
 import com.mongodb.Mongo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.autoconfigure.mongo.MongoProperties;
 import org.springframework.boot.bind.RelaxedPropertyResolver;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Configuration
+@Import(value = MongoAutoConfiguration.class)
 public class DatabaseConfiguration implements EnvironmentAware {
     private ImmutableSet<String> siteNames;
     private RelaxedPropertyResolver propertyResolver;
@@ -84,6 +87,7 @@ public class DatabaseConfiguration implements EnvironmentAware {
         DatabaseConfiguration.this.gridFsTemplateRegister = ImmutableMap.copyOf(gridFsTemplateRegister);
         DatabaseConfiguration.this.mongoTemplateRegister = ImmutableMap.copyOf(mongoTemplateRegister);
     }
+
 
     @PreDestroy
     public void close() {

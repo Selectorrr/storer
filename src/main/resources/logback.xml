@@ -53,6 +53,7 @@
     <logger name="com.mangofactory.swagger" level="WARN"/>
     <logger name="com.wordnik.swagger" level="warn"/>
     <logger name="sun.rmi.transport" level="warn"/>
+    <logger name="org.springframework.security" level="ALL"/>
 
     <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
         <resetJUL>true</resetJUL>
