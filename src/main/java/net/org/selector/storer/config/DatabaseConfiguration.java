@@ -56,7 +56,7 @@ public class DatabaseConfiguration implements EnvironmentAware {
         mongoProperties.setDatabase(propertyResolver.getProperty(dbPrefix + "database"));
         mongoProperties.setAuthenticationDatabase(propertyResolver.getProperty(dbPrefix + "authenticationDatabase"));
         mongoProperties.setGridFsDatabase(propertyResolver.getProperty(dbPrefix + "gridFsDatabase"));
-        mongoProperties.setPassword(propertyResolver.getProperty(dbPrefix + "password", String.class).toCharArray());
+        mongoProperties.setPassword(propertyResolver.getProperty(dbPrefix + "password", char[].class));
         mongoProperties.setUsername(propertyResolver.getProperty(dbPrefix + "username"));
         mongoProperties.setUri(propertyResolver.getProperty(dbPrefix + "uri"));
         return mongoProperties;

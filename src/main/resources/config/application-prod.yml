@@ -13,5 +13,3 @@ sites:
             host: localhost
             port: 27017
             database: petsroom
-            username: petsroom
-            password: Jsl93Ksl
